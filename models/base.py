@@ -8,6 +8,7 @@ from tqdm import tqdm
 from torch.optim import Adam
 from eval import eval_fn
 
+import os
 import fitlog
 import pickle
 import numpy as np
@@ -84,11 +85,18 @@ class PytorchBaseModel(BaseModel, nn.Module):
         self.device = th.device("cuda")
 
     def prepare(self, data: Dict[str, Any]) -> None:
-        feats = [data["node_feat"]]
+        feat = data["node_feat"]
         mp_config = self.config["message_passing"]
-        for i in range(mp_config["max_depth"]):
-            feats.append(th.from_numpy(data["{}_{}".format(mp_config["mode"], i + 1)]))
-        X = th.hstack(feats)
+        if self.config["in_memory"]:
+            feats = [feat]
+            for i in range(mp_config["max_depth"]):
+                feats.append(th.from_numpy(data["{}_{}".format(mp_config["mode"], i + 1)]))
+            X = th.hstack(feats)
+        else:
+            rows = feat.shape[0]
+            cols = feat.shape[1] * (mp_config["max_depth"] + 1)
+            X = np.memmap(os.path.join(mp_config["data_dir"], "{}_all.npy".format(mp_config["mode"])), mode="r", dtype=np.float32, shape=(rows, cols))
+
         y = data["labels"]
 
         train_index = data["train_index"]

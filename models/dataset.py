@@ -23,6 +23,8 @@ class Collator:
         collate_batch = {}
         for key in keys:
             collate_data = [x[key] for x in batch]
+            if isinstance(collate_data[0], np.ndarray):
+                collate_data = [th.from_numpy(x) for x in collate_data]
             tensor = th.stack(collate_data)
             collate_batch[key] = tensor
         return collate_batch
