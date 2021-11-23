@@ -64,4 +64,4 @@ class MLPAttn(PytorchBaseModel):
             output = mean_gates * mlp_out + (1 - mean_gates) * output
         
         logits = self.proj(output)
-        return logits
+        return {"logits": logits, "last_emb": output}

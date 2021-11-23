@@ -1,9 +1,10 @@
-from message_passing import GCNMessagePassing
+from message_passing import GCNMessagePassing, GATMessagePassing
 from models.lr import LRModel
 from models.mlp_attn import MLPAttn
 
 NAME_TO_MP = {
-    "gcn": GCNMessagePassing
+    "gcn": GCNMessagePassing,
+    "gat": GATMessagePassing
 }
 
 NAME_TO_MODEL = {

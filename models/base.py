@@ -161,7 +161,7 @@ class PytorchBaseModel(BaseModel, nn.Module):
                 global_step += 1
 
                 self.train()
-                logits = self.forward(collate_batch)
+                logits = self.forward(collate_batch)["logits"]
                 loss = loss_fn(logits, collate_batch["y"])
                 loss.backward()
 
@@ -195,7 +195,7 @@ class PytorchBaseModel(BaseModel, nn.Module):
         for collate_batch in loader:
             collate_batch = to_device(collate_batch, self.device)
             with th.no_grad():
-                cur_logits = self.forward(collate_batch)
+                cur_logits = self.forward(collate_batch)["logits"]
             _, cur_preds = th.max(cur_logits, dim=1)
             preds.append(cur_preds.detach().cpu().numpy())
         preds = np.hstack(preds)

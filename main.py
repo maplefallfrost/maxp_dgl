@@ -5,6 +5,7 @@ import os
 import numpy as np
 import sys
 import torch
+import pandas as pd
 
 from pathlib import Path
 from utils import load_config, load_dgl_graph, setup_seed
@@ -32,7 +33,7 @@ def message_passing_fn(config: Dict[str, Any]) -> None:
     for i in range(config["max_depth"]):
         cur_save_path = os.path.join(config["save_dir"], "{}_{}.npy".format(config["mp_mode"], str(i + 1)))
         if os.path.exists(cur_save_path):
-            h = torch.from_numpy(np.load(cur_save_path))
+            h = torch.from_numpy(np.load(cur_save_path, allow_pickle=True))
             continue
         
         print("message passing count: {}".format(i + 1))
@@ -91,10 +92,40 @@ def train_eval_fn(config: Dict[str, Any]) -> None:
         model.save(config["model_save_path"])
 
 
+def submit(config: Dict[str, Any]) -> None:
+    data = load_dgl_graph(config["data_dir"])
+    df = pd.read_csv("../data/IDandLabels.csv")
+    paper_id_to_node_id = dict(zip(df.paper_id, df.node_idx))
+    sample_submit = pd.read_csv("../data/sample_submission_for_validation.csv")
+    model = NAME_TO_MODEL[config["model_name"]](config)
+    model.prepare(data)
+
+    if isinstance(model, PytorchBaseModel):
+        device = torch.device("cuda")
+        model = model.to(device)
+    
+    model.load(config["model_save_path"])
+    valid_acc = eval_fn(model, mode="valid")
+    print("valid accuracy: {}".format(valid_acc))
+
+    paper_ids = sample_submit["id"]
+    test_preds = model.predict(mode="test")
+    node_id_to_model_id = {x.item() : i for i, x in enumerate(data["test_index"])}
+
+    submit_preds = []
+    for paper_id in paper_ids:
+        node_id = paper_id_to_node_id[paper_id]
+        model_id = node_id_to_model_id[node_id]
+        cur_pred = chr(ord('A') + test_preds[model_id])
+        submit_preds.append(cur_pred)
+    sample_submit["label"] = submit_preds
+    sample_submit.to_csv(config["submit_path"], index=False)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="maxp dgl contest")
     parser.add_argument("--config_path", type=Path, required=True)
-    parser.add_argument("--mode", choices=["message_passing", "merge_mp", "train", "eval"], required=True)
+    parser.add_argument("--mode", choices=["message_passing", "merge_mp", "train", "eval", "submit"], required=True)
     parser.add_argument("--gpu", type=str, default="0")
     args = parser.parse_args()
 
@@ -106,11 +137,13 @@ if __name__ == "__main__":
         "message_passing": message_passing_fn,
         "merge_mp": merge_mp_files,
         "train": train_eval_fn,
-        "eval": train_eval_fn
+        "eval": train_eval_fn,
+        "submit": submit
     }
 
     if "rng_seed" in config:
         setup_seed(config["rng_seed"])
 
+    print("mode: {}".format(args.mode))
     MODE_TO_FN[args.mode](config)
     fitlog.finish()
