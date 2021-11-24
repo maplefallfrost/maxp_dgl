@@ -14,6 +14,7 @@ from typing import Dict, Any
 from eval import eval_fn
 from models.base import PytorchBaseModel, SklearnBaseModel
 from tqdm import trange
+from pseudo_label import pseudo_label_fn
 
 
 fitlog.set_log_dir("logs/")
@@ -125,7 +126,10 @@ def submit(config: Dict[str, Any]) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="maxp dgl contest")
     parser.add_argument("--config_path", type=Path, required=True)
-    parser.add_argument("--mode", choices=["message_passing", "merge_mp", "train", "eval", "submit"], required=True)
+    parser.add_argument(
+        "--mode", 
+        choices=["message_passing", "merge_mp", "train", "eval", "submit", "pseudo_label"], 
+        required=True)
     parser.add_argument("--gpu", type=str, default="0")
     args = parser.parse_args()
 
@@ -138,7 +142,8 @@ if __name__ == "__main__":
         "merge_mp": merge_mp_files,
         "train": train_eval_fn,
         "eval": train_eval_fn,
-        "submit": submit
+        "submit": submit,
+        "pseudo_label": pseudo_label_fn
     }
 
     if "rng_seed" in config:

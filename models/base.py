@@ -97,13 +97,22 @@ class PytorchBaseModel(BaseModel, nn.Module):
             cols = feat.shape[1] * (mp_config["max_depth"] + 1)
             X = np.memmap(os.path.join(mp_config["data_dir"], "{}_all.npy".format(mp_config["mode"])), mode="r", dtype=np.float32, shape=(rows, cols))
 
+        self.X = X
         y = data["labels"]
 
         train_index = data["train_index"]
         valid_index = data["valid_index"]
         test_index = data["test_index"] 
-        
+
         X_train, y_train = X[train_index, :], y[train_index]
+        if self.config["pseudo_label"]:
+            pl_data = np.load(self.config["pl_data_path"], allow_pickle=True).item()
+            pl_index, pl_labels = pl_data["pl_index"], pl_data["pl_labels"]
+            X_pl, y_pl = X[pl_index, :], th.from_numpy(pl_labels)
+            X_train = np.vstack([X_train, X_pl])
+            y_train = th.hstack([y_train, y_pl])
+            print("training set size after adding pseudo label: {}".format(X_train.shape[0]))
+        
         X_valid, y_valid = X[valid_index, :], y[valid_index]
         X_test, y_test = X[test_index, :], y[test_index] 
         self.y_train = y_train
