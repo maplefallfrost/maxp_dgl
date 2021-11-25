@@ -1,6 +1,6 @@
 from models.base import PytorchBaseModel
 from typing import Dict, Any
-from models.layers import create_mlp_layer
+from models.layers import create_mlp_layer, NAME_TO_ACTIVATION
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,8 @@ class MLPAttn(PytorchBaseModel):
         hidden_dim = nn_config["hidden_dim"]
         activation = nn_config["activation"]
         mp_max_depth = mp_config["max_depth"]
+        self.activation_fn = NAME_TO_ACTIVATION[activation]
+        self.norm = nn.LayerNorm(input_dim)
 
         self.proj = nn.Linear(input_dim, self.config["num_classes"])
 
@@ -44,6 +46,8 @@ class MLPAttn(PytorchBaseModel):
                 for i in range(mp_max_depth + 1)
             ])
         
+        self.dropout = nn.Dropout(nn_config["dropout"])
+        
     def forward(self, collate_batch: Dict[str, Any]) -> torch.Tensor:
         x = collate_batch["x"]
         input_dim = self.config["input_dim"]
@@ -62,6 +66,8 @@ class MLPAttn(PytorchBaseModel):
             
             mean_gates = torch.mean(torch.stack(gates), dim=0)
             output = mean_gates * mlp_out + (1 - mean_gates) * output
+            output = self.activation_fn(self.norm(output))
+            output = self.dropout(output)
         
         logits = self.proj(output)
         return {"logits": logits, "last_emb": output}

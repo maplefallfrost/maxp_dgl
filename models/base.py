@@ -7,6 +7,7 @@ from utils import to_device, AverageMeter
 from tqdm import tqdm
 from torch.optim import Adam
 from eval import eval_fn
+from adabelief_pytorch import AdaBelief
 
 import os
 import fitlog
@@ -159,7 +160,8 @@ class PytorchBaseModel(BaseModel, nn.Module):
         loss_fn = nn.CrossEntropyLoss()
         max_train_steps = self.config["max_epoch"] * len(self.train_loader)
         progress_bar = tqdm(range(max_train_steps))
-        optimizer = Adam(self.parameters(), lr=self.config["lr"])
+        optimizer = AdaBelief(self.parameters(), **self.config["optimizer"])
+        # optimizer = Adam(self.parameters(), lr=self.config["lr"])
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=self.config["max_epoch"])
         losses = AverageMeter()
         best_valid_metric = 0
