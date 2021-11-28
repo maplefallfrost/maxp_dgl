@@ -11,10 +11,13 @@ from pathlib import Path
 from utils import load_config, load_dgl_graph, setup_seed
 from constant import NAME_TO_MP, NAME_TO_MODEL
 from typing import Dict, Any
-from eval import eval_fn
+from evaluate import eval_fn
 from models.base import PytorchBaseModel, SklearnBaseModel
 from tqdm import trange
 from pseudo_label import pseudo_label_fn
+from eda import plot_feature_fn
+from trainers import NAME_TO_TRAINER
+from predictors import NAME_TO_PREDICTOR
 
 
 fitlog.set_log_dir("logs/")
@@ -71,21 +74,25 @@ def train_eval_fn(config: Dict[str, Any]) -> None:
             data["{}_{}".format(mp_config["mode"], i + 1)] = mp_feat
 
     model = NAME_TO_MODEL[config["model_name"]](config)
-    model.prepare(data)
     if isinstance(model, PytorchBaseModel):
         device = torch.device("cuda")
         model = model.to(device)
 
+    predict_config = config["predict"]
+    predictor = NAME_TO_PREDICTOR[predict_config["name"]](config)
+    predictor.prepare(data)
     if config["mode"] == "train":
-        model.fit()
-        train_acc = eval_fn(model, mode="train")
+        trainer = NAME_TO_TRAINER[config["trainer"]["name"]](config)
+        trainer.prepare(data)
+        trainer.fit(model)
+        train_acc = eval_fn(model, predictor, mode="train")
         print("train accuracy: {}".format(train_acc))
         if isinstance(model, PytorchBaseModel):
             model.load(config["model_save_path"])
     else:
         model.load(config["model_save_path"])
 
-    valid_acc = eval_fn(model, mode="valid")
+    valid_acc = eval_fn(model, predictor, mode="valid")
     print("valid accuracy: {}".format(valid_acc))
 
     if config["mode"] == "train" and isinstance(model, SklearnBaseModel):
@@ -99,25 +106,28 @@ def submit(config: Dict[str, Any]) -> None:
     paper_id_to_node_id = dict(zip(df.paper_id, df.node_idx))
     sample_submit = pd.read_csv("../data/sample_submission_for_validation.csv")
     model = NAME_TO_MODEL[config["model_name"]](config)
-    model.prepare(data)
 
     if isinstance(model, PytorchBaseModel):
         device = torch.device("cuda")
         model = model.to(device)
     
+    predict_config = config["predict"]
+    predictor = NAME_TO_PREDICTOR[predict_config["name"]](config)
+    predictor.prepare(data)
+    
     model.load(config["model_save_path"])
-    valid_acc = eval_fn(model, mode="valid")
+    valid_acc = eval_fn(model, predictor, mode="valid")
     print("valid accuracy: {}".format(valid_acc))
 
     paper_ids = sample_submit["id"]
-    test_preds = model.predict(mode="test")
+    test_preds = predictor.predict(model, mode="test")
     node_id_to_model_id = {x.item() : i for i, x in enumerate(data["test_index"])}
 
     submit_preds = []
     for paper_id in paper_ids:
         node_id = paper_id_to_node_id[paper_id]
         model_id = node_id_to_model_id[node_id]
-        cur_pred = chr(ord('A') + test_preds[model_id])
+        cur_pred = chr(ord("A") + test_preds[model_id])
         submit_preds.append(cur_pred)
     sample_submit["label"] = submit_preds
     sample_submit.to_csv(config["submit_path"], index=False)
@@ -128,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--config_path", type=Path, required=True)
     parser.add_argument(
         "--mode", 
-        choices=["message_passing", "merge_mp", "train", "eval", "submit", "pseudo_label"], 
+        choices=["message_passing", "merge_mp", "train", "eval", "submit", "pseudo_label", "plot_feature"], 
         required=True)
     parser.add_argument("--gpu", type=str, default="0")
     args = parser.parse_args()
@@ -143,7 +153,8 @@ if __name__ == "__main__":
         "train": train_eval_fn,
         "eval": train_eval_fn,
         "submit": submit,
-        "pseudo_label": pseudo_label_fn
+        "pseudo_label": pseudo_label_fn,
+        "plot_feature": plot_feature_fn
     }
 
     if "rng_seed" in config:

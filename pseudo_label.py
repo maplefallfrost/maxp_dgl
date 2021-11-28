@@ -4,7 +4,8 @@ from models.dataset import Dataset, Collator
 from torch.utils.data import DataLoader
 from constant import NAME_TO_MODEL
 from tqdm import tqdm
-from eval import eval_fn
+from evaluate import eval_fn
+from predictors import NAME_TO_PREDICTOR
 
 import torch
 import torch.nn as nn
@@ -20,8 +21,10 @@ def threshold_pl(pl_config: Dict[str, Any]) -> None:
     model = model.to(device)
     model.load(config["model_save_path"])
 
-    model.prepare(data)
-    valid_acc = eval_fn(model, mode="valid")
+    predict_config = config["predict"]
+    predictor = NAME_TO_PREDICTOR[predict_config["name"]](config)
+    predictor.prepare(data)
+    valid_acc = eval_fn(model, predictor, mode="valid")
     print("valid accuracy: {}".format(valid_acc))
 
     num_nodes = data["labels"].shape[0]
@@ -35,14 +38,15 @@ def threshold_pl(pl_config: Dict[str, Any]) -> None:
     ulb_index = sorted(list(ulb_index))
 
     y = data["labels"]
-    X_ulb, y_ulb = model.X[ulb_index], y[ulb_index]
+    X_ulb, y_ulb = predictor.X[ulb_index], y[ulb_index]
     ulb_dataset = Dataset(X_ulb, y_ulb)
+    trainer_config = config["trainer"]
     ulb_loader = DataLoader(
         dataset=ulb_dataset,
-        batch_size=config["batch_size"],
+        batch_size=trainer_config["batch_size"],
         shuffle=False,
         collate_fn=Collator(),
-        num_workers=config["num_workers"]
+        num_workers=trainer_config["num_workers"]
     )
 
     start = 0

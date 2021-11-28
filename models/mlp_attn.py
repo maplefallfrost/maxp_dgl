@@ -47,9 +47,11 @@ class MLPAttn(PytorchBaseModel):
             ])
         
         self.dropout = nn.Dropout(nn_config["dropout"])
+        self.input_dropout = nn.Dropout(nn_config["input_dropout"])
         
-    def forward(self, collate_batch: Dict[str, Any]) -> torch.Tensor:
+    def forward(self, collate_batch: Dict[str, Any]) -> Dict[str, torch.Tensor]:
         x = collate_batch["x"]
+        x = self.input_dropout(x)
         input_dim = self.config["input_dim"]
         output = x[:, :self.config["input_dim"]]
         for i in range(len(self.mlps)):
