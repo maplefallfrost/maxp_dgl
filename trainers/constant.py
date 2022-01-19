@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from torch.optim import Adam
+from torch.optim import Adam, RMSprop
 from adabelief_pytorch import AdaBelief
 
 NAME_TO_LOSS = {
@@ -9,5 +9,6 @@ NAME_TO_LOSS = {
 
 NAME_TO_OPTIMIZER = {
     "adam": Adam,
-    "adabelief": AdaBelief
+    "adabelief": AdaBelief,
+    "rmsprop": RMSprop,
 }

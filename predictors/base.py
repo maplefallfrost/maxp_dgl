@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 
 class BasePredictor(ABC):
+    @abstractmethod
     def __init__(self, config):
-        raise NotImplementedError
-
-    def prepare(self, data):
         raise NotImplementedError
 
     @abstractmethod

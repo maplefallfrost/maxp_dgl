@@ -32,7 +32,7 @@ def message_passing_fn(config: Dict[str, Any]) -> None:
 
     os.makedirs(config["save_dir"], exist_ok=True)
 
-    mp = NAME_TO_MP[config["mp_mode"]]()
+    mp = NAME_TO_MP[config["mp_mode"]](config)
     h = node_feat
     for i in range(config["max_depth"]):
         cur_save_path = os.path.join(config["save_dir"], "{}_{}.npy".format(config["mp_mode"], str(i + 1)))
@@ -131,6 +131,7 @@ def submit(config: Dict[str, Any]) -> None:
         submit_preds.append(cur_pred)
     sample_submit["label"] = submit_preds
     sample_submit.to_csv(config["submit_path"], index=False)
+    
 
 
 if __name__ == "__main__":
@@ -154,7 +155,7 @@ if __name__ == "__main__":
         "eval": train_eval_fn,
         "submit": submit,
         "pseudo_label": pseudo_label_fn,
-        "plot_feature": plot_feature_fn
+        "plot_feature": plot_feature_fn,
     }
 
     if "rng_seed" in config:

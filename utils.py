@@ -114,3 +114,21 @@ def to_device(collate_batch, device):
         else:
             device_batch[key] = collate_batch[key]
     return device_batch
+
+
+def get_onehot_labels(labels, idx, n_classes):
+    onehot = th.zeros([labels.shape[0], n_classes])
+    onehot[idx, labels[idx]] = 1
+    return onehot
+
+
+def add_labels(feat, labels, idx, n_classes):
+    onehot = th.zeros([feat.shape[0], n_classes])
+    onehot[idx, labels[idx]] = 1
+    return th.cat([feat, onehot], dim=-1)
+
+
+def set_mask(graph, idx, name):
+    mask = th.zeros((graph.number_of_nodes()), dtype=th.bool).to(graph.device)
+    mask[idx] = 1
+    graph.ndata[name] = mask

@@ -5,22 +5,21 @@ import torch.optim as optim
 
 from tqdm import tqdm
 from typing import Dict, Any
+from torch.utils.data import DataLoader
 from models.base import PytorchBaseModel
 from models.dataset import Dataset, Collator
 from trainers.base import BaseTrainer
 from trainers.constant import NAME_TO_OPTIMIZER
 from trainers.losses import LossWrapper
 from predictors import NAME_TO_PREDICTOR
-from adabelief_pytorch import AdaBelief
 from utils import AverageMeter, to_device
 from evaluate import eval_fn
-from torch.utils.data import DataLoader
 
 class VanillaPytorchTrainer(BaseTrainer):
     def __init__(self, config: Dict[str, Any]) -> None:
         self.config = config
     
-    def prepare(self, data: Dict[str, Any]) -> None:
+    def _prepare(self, data: Dict[str, Any]) -> None:
         feat = data["node_feat"]
         mp_config = self.config["message_passing"]
         if self.config["in_memory"]:
@@ -38,7 +37,8 @@ class VanillaPytorchTrainer(BaseTrainer):
 
         train_index = data["train_index"]
         X_train, y_train = X[train_index, :], y[train_index]
-        train_dataset = Dataset(X_train, y_train)
+        # train_dataset = Dataset(X_train, y_train)
+        train_dataset = Dataset(X, y, train_index)
 
         self.trainer_config = self.config["trainer"]
         self.train_loader = DataLoader(
@@ -53,6 +53,9 @@ class VanillaPytorchTrainer(BaseTrainer):
         predictor = NAME_TO_PREDICTOR[predict_config["name"]](self.config)
         predictor.prepare(data)
         self.predictor = predictor
+    
+    def prepare(self, data: Dict[str, Any]) -> None:
+        self._prepare(data)
     
     def fit(self, model: PytorchBaseModel) -> None:
         optimizer_config = self.config["optimizer"]
@@ -72,16 +75,19 @@ class VanillaPytorchTrainer(BaseTrainer):
 
                 optimizer.zero_grad()
                 output = model(collate_batch)
-                loss = LossWrapper.forward(self.config, collate_batch, output)
+                loss = 0
+                for loss_name in self.config["losses"]:
+                    if loss_name in ["cross_entropy", "loge"]:
+                        loss += LossWrapper.forward(loss_name, logits=output["logits"], y=collate_batch["y"])
                 loss.backward()
                 optimizer.step()
-                scheduler.step()
 
                 losses.update(loss.item(), self.trainer_config["batch_size"])
                 if global_step % self.trainer_config["log_every"] == 0:
-                    fitlog.add_loss(loss.item(), name="loss", step=global_step)
+                    fitlog.add_loss(losses.avg, name="loss", step=global_step)
                 progress_bar.update(1)
             
+            scheduler.step()
             valid_metric = eval_fn(model, self.predictor, mode="valid")
             fitlog.add_metric({"valid": {"accuracy": valid_metric}}, step=epoch)
             if valid_metric > best_valid_metric:

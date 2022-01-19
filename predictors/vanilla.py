@@ -25,17 +25,13 @@ class VanillaPytorchPredictor(BasePredictor):
         valid_index = data["valid_index"]
         test_index = data["test_index"] 
 
-        X_train, y_train = X[train_index, :], y[train_index]
-        X_valid, y_valid = X[valid_index, :], y[valid_index]
-        X_test, y_test = X[test_index, :], y[test_index] 
-
         # for used in evaluation
-        self.y_train = y_train
-        self.y_valid = y_valid
+        self.y_train = y[train_index]
+        self.y_valid = y[valid_index]
 
-        train_dataset = Dataset(X_train, y_train)
-        valid_dataset = Dataset(X_valid, y_valid)
-        test_dataset = Dataset(X_test, y_test)
+        train_dataset = Dataset(X, y, train_index)
+        valid_dataset = Dataset(X, y, valid_index)
+        test_dataset = Dataset(X, y, test_index)
 
         trainer_config = self.config["trainer"]
         self.train_loader = DataLoader(
